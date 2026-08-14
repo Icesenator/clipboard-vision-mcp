@@ -2,7 +2,7 @@
 
 > 🇫🇷 **[Version française disponible → README.fr.md](README.fr.md)**
 
-> Add vision to text-only models in Opencode (**DeepSeek V4**, **GLM 5.1**) — **see the image in your clipboard directly**, no manual file saving.
+> Add vision to text-only models in Opencode (**DeepSeek V4**, **GLM 5.3**) — **see the image in your clipboard directly**, no manual file saving.
 
 **Tested on Windows 11 + Opencode + DeepSeek V4 Pro.** Multi-OS clipboard support (Windows / macOS / Linux X11 / Linux Wayland).
 
@@ -12,7 +12,7 @@ Forked from [itcomgroup/vision-mcp-server](https://github.com/itcomgroup/vision-
 
 ## The problem
 
-Cheap/fast text-only models like **DeepSeek V4** and **GLM 5.1** are great for code, but they cannot read images. Every time you paste a screenshot, the model asks you to save it to disk and provide a path.
+Cheap/fast text-only models like **DeepSeek V4** and **GLM 5.3** are great for code, but they cannot read images. Every time you paste a screenshot, the model asks you to save it to disk and provide a path.
 
 ## The fix
 
