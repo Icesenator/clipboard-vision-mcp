@@ -6,7 +6,6 @@ import io
 import os
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace
 
 from PIL import Image
 
@@ -28,25 +27,30 @@ def _png_file() -> Path:
     return tmp
 
 
-class FakeCompletions:
+class FakeResponse:
+    def __init__(self, status_code=200, payload=None, text=""):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = text
+
+    def json(self):
+        return self._payload
+
+
+class FakeHTTPXClient:
     def __init__(self, fail_models: list[str], ok_content: str = "REPONSE_OK"):
         self.fail_models = fail_models
         self.ok_content = ok_content
         self.calls: list[str] = []
 
-    async def create(self, **kwargs):
-        model = kwargs["model"]
+    async def post(self, url, headers=None, json=None):
+        model = json["model"]
         self.calls.append(model)
         if model in self.fail_models:
             raise RuntimeError("429 rate limited")
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=self.ok_content))]
+        return FakeResponse(
+            payload={"choices": [{"message": {"content": self.ok_content}}]}
         )
-
-
-class FakeClient:
-    def __init__(self, fail_models):
-        self.chat = SimpleNamespace(completions=FakeCompletions(fail_models))
 
 
 def test_liste_lue_depuis_env():
@@ -68,15 +72,15 @@ def test_fallback_essaie_les_modeles_dans_l_ordre():
     srv2 = _reload_server()
     try:
         client = srv2.VisionClient(api_key="fake")
-        fake = FakeClient(fail_models=["m1", "m2"])
-        client.client = fake
+        fake = FakeHTTPXClient(fail_models=["m1", "m2"])
+        client._client = fake
         path = _png_file()
         try:
             result = asyncio.run(client.analyze(str(path), "Decris"))
         finally:
             path.unlink(missing_ok=True)
         assert result == "REPONSE_OK"
-        assert fake.chat.completions.calls == ["m1", "m2", "m3"]
+        assert fake.calls == ["m1", "m2", "m3"]
     finally:
         del os.environ["GROQ_VISION_MODELS"]
 
@@ -86,8 +90,8 @@ def test_tous_les_modeles_echouent_leve_une_erreur_claire():
     srv2 = _reload_server()
     try:
         client = srv2.VisionClient(api_key="fake")
-        fake = FakeClient(fail_models=["m1", "m2", "m3"])
-        client.client = fake
+        fake = FakeHTTPXClient(fail_models=["m1", "m2", "m3"])
+        client._client = fake
         path = _png_file()
         try:
             try:

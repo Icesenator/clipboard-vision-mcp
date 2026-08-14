@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
-from groq import AsyncGroq
+import httpx
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
@@ -28,6 +28,13 @@ from .clipboard import ClipboardError, save_clipboard_image
 
 SERVER_NAME = "clipboard-vision-mcp"
 SERVER_VERSION = "0.1.0"
+DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
+API_KEY = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY")
+BASE_URL = (
+    os.environ.get("GROQ_BASE_URL")
+    or os.environ.get("OPENAI_BASE_URL")
+    or DEFAULT_BASE_URL
+)
 DEFAULT_VISION_MODEL = "qwen/qwen3.6-27b"
 # Read once at startup. GROQ_VISION_MODEL is the documented name; VISION_MODEL
 # is kept as a fallback so configs written before the Llama-4 Scout deprecation
@@ -106,8 +113,10 @@ server = Server(SERVER_NAME)
 
 
 class VisionClient:
-    def __init__(self, api_key: str):
-        self.client = AsyncGroq(api_key=api_key)
+    def __init__(self, api_key: str, base_url: str = DEFAULT_BASE_URL):
+        self.api_key = api_key
+        self.base_url = base_url
+        self._client = httpx.AsyncClient(timeout=240)
 
     async def analyze(self, image_path: str, prompt: str) -> str:
         p = _validate_image_path(image_path)
@@ -132,13 +141,23 @@ class VisionClient:
         last_error: Exception | None = None
         for model in VISION_MODELS:
             try:
-                response = await self.client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=0.5,
-                    max_tokens=MAX_OUTPUT_TOKENS,
+                response = await self._client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "temperature": 0.5,
+                        "max_tokens": MAX_OUTPUT_TOKENS,
+                    },
                 )
-                return _strip_reasoning(response.choices[0].message.content or "")
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        f"HTTP {response.status_code}: {response.text[:300]}"
+                    )
+                payload = response.json()
+                content = payload["choices"][0]["message"]["content"] or ""
+                return _strip_reasoning(content)
             except Exception as error:  # noqa: BLE001 — provider-level failure (429/5xx/timeout), try next model
                 last_error = error
                 continue
@@ -147,6 +166,9 @@ class VisionClient:
         raise RuntimeError(
             f"Vision failed on all models ({tried}). Last error: {last_error or 'unknown'}"
         )
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
 
 vision_client: VisionClient | None = None
@@ -298,8 +320,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [
             TextContent(
                 type="text",
-                text="Error: GROQ_API_KEY is not set. "
-                "Get a free key at https://console.groq.com/keys",
+                text="Error: no API key configured. Set GROQ_API_KEY or OPENAI_API_KEY.",
             )
         ]
 
@@ -343,9 +364,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
 async def main() -> None:
     global vision_client
-    api_key = os.environ.get("GROQ_API_KEY")
-    if api_key:
-        vision_client = VisionClient(api_key)
+    if API_KEY:
+        vision_client = VisionClient(API_KEY, BASE_URL)
 
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
