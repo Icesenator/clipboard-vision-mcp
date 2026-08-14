@@ -156,6 +156,25 @@ cooldown. All models failing raises a clear error listing the tried models.
 When `GROQ_VISION_MODELS` is unset or empty, the server falls back to the
 single `GROQ_VISION_MODEL` (backward compatible).
 
+#### Local router support (e.g. FreeLLMAPI)
+
+The Groq SDK reads `GROQ_BASE_URL` from the environment, so the server can
+target **any OpenAI-compatible router** instead of the Groq cloud — no code
+change, no Groq API key. Combined with the fallback chain, this is a good fit
+for local aggregators where vision models sit behind different providers with
+**independent quotas** (a model on cooldown is simply skipped for the next one).
+
+Example with a local FreeLLMAPI router on `127.0.0.1:3001`:
+
+```json
+"environment": {
+  "GROQ_BASE_URL": "http://127.0.0.1:3001/v1",
+  "GROQ_API_KEY": "your_local_router_key",
+  "GROQ_VISION_MODELS": "qwen3.6-27b,llama-4-maverick,gemini-3.6-flash"
+}
+```
+
+
 ### 5. ⚠️ Opencode keybindings for pasting images (Alt+V)
 
 Two important facts about opencode (these are easy to get wrong):
