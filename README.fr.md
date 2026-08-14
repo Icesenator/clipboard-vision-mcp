@@ -2,7 +2,7 @@
 
 > 🇬🇧 **[English version → README.md](README.md)**
 
-> Ajoute la vision aux modèles texte-only dans Opencode (**DeepSeek V4**, **GLM 5.1**) — **lis directement l'image dans ton presse-papiers**, sans sauvegarder de fichier à la main.
+> Ajoute la vision aux modèles texte-only dans Opencode (**DeepSeek V4**, **GLM 5.3**) — **lis directement l'image dans ton presse-papiers**, sans sauvegarder de fichier à la main.
 
 **Testé sur Windows 11 + Opencode + DeepSeek V4 Pro.** Support clipboard multi-OS (Windows / macOS / Linux X11 / Linux Wayland).
 
@@ -12,7 +12,7 @@ Forké depuis [itcomgroup/vision-mcp-server](https://github.com/itcomgroup/visio
 
 ## Le problème
 
-Les modèles texte-only rapides et peu coûteux comme **DeepSeek V4** et **GLM 5.1** sont excellents pour le code mais ne savent pas lire d'images. À chaque capture d'écran collée, le modèle te demande de la sauvegarder sur disque et de lui donner le chemin.
+Les modèles texte-only rapides et peu coûteux comme **DeepSeek V4** et **GLM 5.3** sont excellents pour le code mais ne savent pas lire d'images. À chaque capture d'écran collée, le modèle te demande de la sauvegarder sur disque et de lui donner le chemin.
 
 ## La solution
 
