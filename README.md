@@ -139,6 +139,23 @@ The model id is read once at startup from `GROQ_VISION_MODEL`, defaulting to `qw
 
 Useful when Groq retires a model — as happened to `meta-llama/llama-4-scout-17b-16e-instruct` on 2026-06-17. Pick any vision model from https://console.groq.com/docs/models; no code change required. The older `VISION_MODEL` name still works as a fallback.
 
+#### Fallback chain (recommended)
+
+Instead of a single model, set `GROQ_VISION_MODELS` to a **comma-separated list**
+tried in order. If a model is rate-limited (HTTP 429), down (5xx) or times out,
+the next one is attempted, so vision keeps working while one provider is on
+cooldown. All models failing raises a clear error listing the tried models.
+
+```json
+"environment": {
+  "GROQ_API_KEY": "gsk_your_key_here",
+  "GROQ_VISION_MODELS": "qwen/qwen3.6-27b,meta-llama/llama-4-maverick-17b-128e-instruct"
+}
+```
+
+When `GROQ_VISION_MODELS` is unset or empty, the server falls back to the
+single `GROQ_VISION_MODEL` (backward compatible).
+
 ### 5. ⚠️ Opencode keybindings for pasting images (Alt+V)
 
 Two important facts about opencode (these are easy to get wrong):

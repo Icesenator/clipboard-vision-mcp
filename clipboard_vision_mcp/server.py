@@ -43,6 +43,15 @@ VISION_MODEL = (
 # budget now truncates the actual answer mid-sentence.
 MAX_OUTPUT_TOKENS = int(os.environ.get("GROQ_VISION_MAX_TOKENS", "4096"))
 
+# Fallback chain: GROQ_VISION_MODELS (comma-separated) is tried in order.
+# A model that is rate-limited (429), down (5xx) or timing out is skipped and
+# the next one is attempted, so vision keeps working while one provider is
+# on cooldown. Falls back to GROQ_VISION_MODEL (single model) when unset.
+VISION_MODELS = (
+    [m.strip() for m in os.environ.get("GROQ_VISION_MODELS", "").split(",") if m.strip()]
+    or [VISION_MODEL]
+)
+
 _THINK_BLOCK = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
 
 
@@ -107,24 +116,37 @@ class VisionClient:
         _validate_magic(data)
         b64 = base64.b64encode(data).decode("utf-8")
 
-        response = await self.client.chat.completions.create(
-            model=VISION_MODEL,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{b64}"},
-                        },
-                    ],
-                }
-            ],
-            temperature=0.5,
-            max_tokens=MAX_OUTPUT_TOKENS,
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    },
+                ],
+            }
+        ]
+
+        last_error: Exception | None = None
+        for model in VISION_MODELS:
+            try:
+                response = await self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.5,
+                    max_tokens=MAX_OUTPUT_TOKENS,
+                )
+                return _strip_reasoning(response.choices[0].message.content or "")
+            except Exception as error:  # noqa: BLE001 — provider-level failure (429/5xx/timeout), try next model
+                last_error = error
+                continue
+
+        tried = ", ".join(VISION_MODELS)
+        raise RuntimeError(
+            f"Vision failed on all models ({tried}). Last error: {last_error or 'unknown'}"
         )
-        return _strip_reasoning(response.choices[0].message.content or "")
 
 
 vision_client: VisionClient | None = None
